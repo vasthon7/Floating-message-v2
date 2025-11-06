@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 공유 메시지</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #FFB6C1 0%, #87CEEB 100%);
+            font-family: 'Malgun Gothic', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            position: relative;
+        }
+
+        .name-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            background: linear-gradient(135deg, #FFB6C1 0%, #87CEEB 100%);
+        }
+
+        .name-screen.hidden {
+            display: none;
+        }
+
+        .name-input-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .name-input-box h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .name-input-box input {
+            width: 300px;
+            padding: 15px 20px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            outline: none;
+        }
+
+        .name-input-box input:focus {
+            border-color: #FFB6C1;
+        }
+
+        .name-input-box button {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            background-color: #FFB6C1;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        .name-input-box button:hover {
+            background-color: #FF9DB3;
+        }
+
+        .main-screen {
+            display: none;
+        }
+
+        .main-screen.show {
+            display: block;
+        }
+
+        .input-container {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+        }
+
+        #messageInput {
+            width: 400px;
+            padding: 15px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px 0 0 8px;
+            background-color: #fff;
+            color: #000;
+            outline: none;
+            height: 50px;
+        }
+
+        #messageInput::placeholder {
+            color: #888;
+        }
+
+        .send-btn {
+            width: 50px;
+            height: 50px;
+            background-color: #FFB6C1;
+            border: none;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #fff;
+            transition: background-color 0.2s;
+        }
+
+        .send-btn:hover {
+            background-color: #FF9DB3;
+        }
+
+        .send-btn:active {
+            background-color: #FF8AA5;
+        }
+
+        .bubble {
+            position: absolute;
+            padding: 12px 20px;
+            border-radius: 20px;
+            font-size: 16px;
+            white-space: nowrap;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            animation: float 0.5s ease-out;
+            border: 2px solid;
+            padding-bottom: 12px;
+        }
+
+        .bubble.with-timer {
+            padding-bottom: 30px;
+        }
+
+        .bubble-timer {
+            position: absolute;
+            bottom: 5px;
+            right: 10px;
+            font-size: 11px;
+        }
+
+        @keyframes float {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .delete-btn {
+            position: absolute;
+            padding: 8px 15px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+        }
+
+        .delete-btn:hover {
+            background: #d32f2f;
+        }
+
+        .delete-btn.show {
+            display: block;
+        }
+
+        .username-tooltip {
+            position: absolute;
+            padding: 8px 15px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 1000;
+            display: none;
+            pointer-events: none;
+        }
+
+        .username-tooltip.show {
+            display: block;
+        }
+
+        .warning {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff0000;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 200;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px 40px;
+            border-radius: 10px;
+        }
+
+        .warning.show {
+            opacity: 1;
+        }
+
+        .settings-icon {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            z-index: 150;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: transform 0.3s;
+        }
+
+        .settings-icon:hover {
+            transform: rotate(90deg);
+        }
+
+        .settings-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 300;
+            min-width: 400px;
+            display: none;
+        }
+
+        .settings-modal.show {
+            display: block;
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .settings-header h2 {
+            margin: 0;
+        }
+
+        .close-btn {
+            cursor: pointer;
+            font-size: 24px;
+            color: #999;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .setting-item {
+            margin: 20px 0;
+        }
+
+        .setting-item label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .setting-item input[type="color"] {
+            width: 100px;
+            height: 40px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .apply-btn {
+            margin-left: 10px;
+            padding: 8px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        .apply-btn:hover {
+            background-color: #45a049;
+        }
+
+        .apply-btn:active {
+            background-color: #3d8b40;
+        }
+
+        .setting-item input[type="range"] {
+            width: 100%;
+        }
+
+        .setting-item .range-value {
+            display: inline-block;
+            margin-left: 10px;
+            font-weight: bold;
+            color: #666;
+        }
+
+        .toggle-switch {
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+            background: #ccc;
+            border-radius: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.on {
+            background: #4CAF50;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s;
+        }
+
+        .toggle-switch.on::after {
+            left: 28px;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 250;
+            display: none;
+        }
+
+        .overlay.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="name-screen" id="nameScreen">
+        <div class="name-input-box">
+            <h1>이름을 입력해주세요</h1>
+            <input type="text" id="nameInput" placeholder="이름" maxlength="20">
+            <button id="nameSubmitBtn">시작하기</button>
+        </div>
+    </div>
+
+    <div class="main-screen" id="mainScreen">
+        <div class="settings-icon" id="settingsIcon">⚙️</div>
+        
+        <div class="overlay" id="overlay"></div>
+        
+        <div class="settings-modal" id="settingsModal">
+            <div class="settings-header">
+                <h2>설정</h2>
+                <button class="close-btn" id="closeBtn">✕</button>
+            </div>
+            
+            <div class="setting-item">
+                <label>말풍선 색상</label>
+                <input type="color" id="bubbleColor" value="#FFD700">
+                <button class="apply-btn" id="applyColorBtn">적용</button>
+            </div>
+            
+            <div class="setting-item">
+                <label>말풍선 지속시간 <span class="range-value" id="durationValue">10분</span></label>
+                <input type="range" id="duration" min="1" max="20" value="10">
+            </div>
+            
+            <div class="setting-item">
+                <label>다른 사람의 말풍선 보기</label>
+                <div class="toggle-switch on" id="showOthers"></div>
+            </div>
+            
+            <div class="setting-item">
+                <label>말풍선 수명 보기</label>
+                <div class="toggle-switch on" id="showTimer"></div>
+            </div>
+            
+            <div class="setting-item">
+                <button class="apply-btn" id="clearMyBtn" style="background-color: #f44336; width: 100%;">내 메시지 모두 지우기</button>
+            </div>
+        </div>
+        
+        <div class="input-container">
+            <input type="text" id="messageInput" placeholder="메시지를 입력해주세요.">
+            <button class="send-btn" id="sendBtn">→</button>
+        </div>
+        
+        <div class="warning" id="warning">메시지가 10개 미만으로 내려갈 때까지 기다려주세요.</div>
+        <div class="delete-btn" id="deleteBtn">지우기</div>
+        <div class="username-tooltip" id="usernameTooltip"></div>
+    </div>
+
+    <script>
+        const nameScreen = document.getElementById('nameScreen');
+        const mainScreen = document.getElementById('mainScreen');
+        const nameInput = document.getElementById('nameInput');
+        const nameSubmitBtn = document.getElementById('nameSubmitBtn');
+        const input = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const warning = document.getElementById('warning');
+        const settingsIcon = document.getElementById('settingsIcon');
+        const settingsModal = document.getElementById('settingsModal');
+        const overlay = document.getElementById('overlay');
+        const closeBtn = document.getElementById('closeBtn');
+        const bubbleColorInput = document.getElementById('bubbleColor');
+        const applyColorBtn = document.getElementById('applyColorBtn');
+        const durationInput = document.getElementById('duration');
+        const durationValue = document.getElementById('durationValue');
+        const showOthersToggle = document.getElementById('showOthers');
+        const showTimerToggle = document.getElementById('showTimer');
+        const clearMyBtn = document.getElementById('clearMyBtn');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const usernameTooltip = document.getElementById('usernameTooltip');
+        
+        const bubbles = {};
+        const myBubbles = [];
+        const MAX_MY_BUBBLES = 10;
+        
+        let userId = 'user_' + Math.random().toString(36).substr(2, 9);
+        let username = '';
+        let selectedBubbleId = null;
+        let settings = {
+            color: '#FFD700',
+            duration: 10,
+            showOthers: true,
+            showTimer: true
+        };
+
+        const excludedColors = ['#FFB6C1', '#87CEEB', '#FFFFFF', '#888888', '#FF0000'];
+
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color;
+            do {
+                color = '#';
+                for (let i = 0; i < 6; i++) {
+                    color += letters[Math.floor(Math.random() * 16)];
+                }
+            } while (excludedColors.some(exc => 
+                Math.abs(parseInt(color.slice(1), 16) - parseInt(exc.slice(1), 16)) < 2000000
+            ));
+            return color;
+        }
+
+        function getBrightness(color) {
+            const hex = color.replace('#', '');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            return (r * 299 + g * 587 + b * 114) / 1000;
+        }
+
+        function getRandomPosition() {
+            const margin = 100;
+            return {
+                x: margin + Math.random() * (window.innerWidth - margin * 2),
+                y: margin + Math.random() * (window.innerHeight - margin * 2)
+            };
+        }
+
+        function getRandomVelocity() {
+            const speed = 0.3 + Math.random() * 0.7;
+            const angle = Math.random() * Math.PI * 2;
+            return {
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed
+            };
+        }
+
+        nameSubmitBtn.addEventListener('click', () => {
+            const name = nameInput.value.trim();
+            if (name) {
+                username = name;
+                nameScreen.classList.add('hidden');
+                mainScreen.classList.add('show');
+                loadMessages();
+                setInterval(loadMessages, 3000);
+                updateBubbles();
+            } else {
+                alert('이름을 입력해주세요.');
+            }
+        });
+
+        nameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                nameSubmitBtn.click();
+            }
+        });
+
+        async function createBubble(text, color, duration, username, isMyMessage = false) {
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble with-timer';
+            bubble.textContent = text;
+            
+            const brightness = getBrightness(color);
+            const textColor = brightness > 128 ? '#000000' : '#FFFFFF';
+            
+            bubble.style.backgroundColor = color;
+            bubble.style.color = textColor;
+            bubble.style.borderColor = textColor;
+            
+            const timer = document.createElement('div');
+            timer.className = 'bubble-timer';
+            timer.style.color = textColor;
+            timer.style.display = 'block';
+            timer.textContent = `${duration}:00`;
+            bubble.appendChild(timer);
+            
+            const pos = getRandomPosition();
+            const vel = getRandomVelocity();
+            
+            bubble.style.left = pos.x + 'px';
+            bubble.style.top = pos.y + 'px';
+            
+            document.body.appendChild(bubble);
+            
+            const bubbleId = Date.now() + '_' + Math.random();
+            const endTime = Date.now() + (duration * 60 * 1000);
+            
+            const bubbleData = {
+                id: bubbleId,
+                element: bubble,
+                timer: timer,
+                x: pos.x,
+                y: pos.y,
+                vx: vel.vx,
+                vy: vel.vy,
+                width: bubble.offsetWidth,
+                height: bubble.offsetHeight,
+                endTime: endTime,
+                userId: userId,
+                username: username,
+                isMyMessage: isMyMessage
+            };
+            
+            bubbles[bubbleId] = bubbleData;
+            
+            bubble.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleBubbleClick(bubbleId);
+            });
+            
+            if (isMyMessage) {
+                myBubbles.push(bubbleId);
+                
+                try {
+                    await window.storage.set(bubbleId, JSON.stringify({
+                        text: text,
+                        color: color,
+                        duration: duration,
+                        userId: userId,
+                        username: username,
+                        endTime: endTime,
+                        pos: pos,
+                        vel: vel
+                    }), true);
+                } catch (error) {
+                    console.error('Storage error:', error);
+                }
+            }
+            
+            updateTimer(bubbleData);
+        }
+
+        function handleBubbleClick(bubbleId) {
+            const bubbleData = bubbles[bubbleId];
+            if (!bubbleData) return;
+
+            selectedBubbleId = bubbleId;
+            deleteBtn.classList.remove('show');
+            usernameTooltip.classList.remove('show');
+
+            if (bubbleData.isMyMessage) {
+                deleteBtn.style.left = (bubbleData.x + bubbleData.width + 10) + 'px';
+                deleteBtn.style.top = bubbleData.y + 'px';
+                deleteBtn.classList.add('show');
+            } else {
+                usernameTooltip.textContent = bubbleData.username;
+                usernameTooltip.style.left = (bubbleData.x + bubbleData.width + 10) + 'px';
+                usernameTooltip.style.top = bubbleData.y + 'px';
+                usernameTooltip.classList.add('show');
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('bubble') && e.target.id !== 'deleteBtn') {
+                deleteBtn.classList.remove('show');
+                usernameTooltip.classList.remove('show');
+                selectedBubbleId = null;
+            }
+        });
+
+        deleteBtn.addEventListener('click', async () => {
+            if (selectedBubbleId) {
+                await removeBubble(selectedBubbleId);
+                deleteBtn.classList.remove('show');
+                selectedBubbleId = null;
+            }
+        });
+
+        function updateTimer(bubbleData) {
+            if (!bubbleData.element || !bubbleData.element.parentNode) return;
+            
+            const remaining = Math.max(0, bubbleData.endTime - Date.now());
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            
+            const bgColor = bubbleData.element.style.backgroundColor;
+            const brightness = getBrightness(bgColor);
+            const textColor = brightness > 128 ? '#000000' : '#FFFFFF';
+            
+            if (bubbleData.timer) {
+                bubbleData.timer.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                bubbleData.timer.style.color = textColor;
+                
+                if (settings.showTimer) {
+                    bubbleData.element.classList.add('with-timer');
+                    bubbleData.timer.style.display = 'block';
+                } else {
+                    bubbleData.element.classList.remove('with-timer');
+                    bubbleData.timer.style.display = 'none';
+                }
+            }
+            
+            if (remaining <= 0) {
+                removeBubble(bubbleData.id);
+            } else {
+                setTimeout(() => updateTimer(bubbleData), 1000);
+            }
+        }
+
+        async function removeBubble(bubbleId) {
+            const bubbleData = bubbles[bubbleId];
+            if (!bubbleData) return;
+            
+            if (bubbleData.element) {
+                bubbleData.element.remove();
+            }
+            delete bubbles[bubbleId];
+            
+            const myIndex = myBubbles.indexOf(bubbleId);
+            if (myIndex > -1) {
+                myBubbles.splice(myIndex, 1);
+            }
+            
+            try {
+                await window.storage.delete(bubbleId, true);
+            } catch (error) {
+                console.error('Storage delete error:', error);
+            }
+        }
+
+        function updateBubbles() {
+            Object.values(bubbles).forEach(b => {
+                if (!settings.showOthers && !b.isMyMessage) {
+                    b.element.style.display = 'none';
+                    return;
+                } else {
+                    b.element.style.display = 'block';
+                }
+                
+                b.x += b.vx;
+                b.y += b.vy;
+                
+                if (b.x <= 0 || b.x + b.width >= window.innerWidth) {
+                    b.vx *= -1;
+                    b.x = Math.max(0, Math.min(b.x, window.innerWidth - b.width));
+                }
+                
+                if (b.y <= 0 || b.y + b.height >= window.innerHeight) {
+                    b.vy *= -1;
+                    b.y = Math.max(0, Math.min(b.y, window.innerHeight - b.height));
+                }
+                
+                b.element.style.left = b.x + 'px';
+                b.element.style.top = b.y + 'px';
+            });
+            
+            requestAnimationFrame(updateBubbles);
+        }
+
+        async function loadMessages() {
+            try {
+                const result = await window.storage.list('', true);
+                if (result && result.keys) {
+                    for (const key of result.keys) {
+                        try {
+                            const data = await window.storage.get(key, true);
+                            if (data && data.value) {
+                                const bubbleInfo = JSON.parse(data.value);
+                                
+                                if (bubbleInfo.endTime < Date.now()) {
+                                    await window.storage.delete(key, true);
+                                    continue;
+                                }
+                                
+                                if (bubbles[key]) continue;
+                                
+                                const bubble = document.createElement('div');
+                                bubble.className = 'bubble with-timer';
+                                bubble.textContent = bubbleInfo.text;
+                                
+                                const brightness = getBrightness(bubbleInfo.color);
+                                const textColor = brightness > 128 ? '#000000' : '#FFFFFF';
+                                
+                                bubble.style.backgroundColor = bubbleInfo.color;
+                                bubble.style.color = textColor;
+                                bubble.style.borderColor = textColor;
+                                
+                                const timer = document.createElement('div');
+                                timer.className = 'bubble-timer';
+                                timer.style.color = textColor;
+                                timer.style.display = 'block';
+                                bubble.appendChild(timer);
+                                
+                                bubble.style.left = bubbleInfo.pos.x + 'px';
+                                bubble.style.top = bubbleInfo.pos.y + 'px';
+                                
+                                document.body.appendChild(bubble);
+                                
+                                const isMyMessage = bubbleInfo.userId === userId;
+                                
+                                const bubbleData = {
+                                    id: key,
+                                    element: bubble,
+                                    timer: timer,
+                                    x: bubbleInfo.pos.x,
+                                    y: bubbleInfo.pos.y,
+                                    vx: bubbleInfo.vel.vx,
+                                    vy: bubbleInfo.vel.vy,
+                                    width: bubble.offsetWidth,
+                                    height: bubble.offsetHeight,
+                                    endTime: bubbleInfo.endTime,
+                                    userId: bubbleInfo.userId,
+                                    username: bubbleInfo.username,
+                                    isMyMessage: isMyMessage
+                                };
+                                
+                                bubbles[key] = bubbleData;
+                                
+                                bubble.addEventListener('click', (e) => {
+                                    e.stopPropagation();
+                                    handleBubbleClick(key);
+                                });
+                                
+                                if (isMyMessage) {
+                                    myBubbles.push(key);
+                                }
+                                
+                                updateTimer(bubbleData);
+                            }
+                        } catch (error) {
+                            console.error('Error loading bubble:', error);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        async function handleSendMessage() {
+            const text = input.value.trim();
+            input.value = '';
+            input.focus();
+            
+            if (text) {
+                if (myBubbles.length >= MAX_MY_BUBBLES) {
+                    warning.classList.add('show');
+                    setTimeout(() => {
+                        warning.classList.remove('show');
+                    }, 2000);
+                } else {
+                    await createBubble(text, settings.color, settings.duration, username, true);
+                }
+            }
+        }
+
+        input.addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+                await handleSendMessage();
+            }
+        });
+
+        sendBtn.addEventListener('click', async () => {
+            await handleSendMessage();
+        });
+
+        settingsIcon.addEventListener('click', () => {
+            settingsModal.classList.add('show');
+            overlay.classList.add('show');
+        });
+
+        closeBtn.addEventListener('click', () => {
+            settingsModal.classList.remove('show');
+            overlay.classList.remove('show');
+        });
+
+        overlay.addEventListener('click', () => {
+            settingsModal.classList.remove('show');
+            overlay.classList.remove('show');
+        });
+
+        applyColorBtn.addEventListener('click', () => {
+            settings.color = bubbleColorInput.value;
+        });
+
+        durationInput.addEventListener('input', (e) => {
+            settings.duration = parseInt(e.target.value);
+            durationValue.textContent = settings.duration + '분';
+        });
+
+        showOthersToggle.addEventListener('click', () => {
+            settings.showOthers = !settings.showOthers;
+            showOthersToggle.classList.toggle('on');
+        });
+
+        showTimerToggle.addEventListener('click', () => {
+            settings.showTimer = !settings.showTimer;
+            showTimerToggle.classList.toggle('on');
+            
+            Object.values(bubbles).forEach(b => {
+                if (settings.showTimer) {
+                    b.element.classList.add('with-timer');
+                    if (b.timer) {
+                        b.timer.style.display = 'block';
+                    }
+                } else {
+                    b.element.classList.remove('with-timer');
+                    if (b.timer) {
+                        b.timer.style.display = 'none';
+                    }
+                }
+            });
+        });
+
+        clearMyBtn.addEventListener('click', async () => {
+            if (confirm('내 메시지를 모두 지우시겠습니까?')) {
+                try {
+                    const myBubblesCopy = [...myBubbles];
+                    
+                    for (const bubbleId of myBubblesCopy) {
+                        await removeBubble(bubbleId);
+                    }
+                    
+                    alert('내 메시지가 모두 삭제되었습니다.');
+                } catch (error) {
+                    console.error('Clear my messages error:', error);
+                    alert('메시지 삭제 중 오류가 발생했습니다.');
+                }
+            }
+        });
+
+        settings.color = getRandomColor();
+        bubbleColorInput.value = settings.color;
+    </script>
+</body>
+</html>
